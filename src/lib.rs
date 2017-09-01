@@ -78,7 +78,7 @@ use std::mem;
 use std::ops::{Index, IndexMut};
 use std::ptr;
 
-struct KeyRef<K> { k: *const K }
+struct KeyRef<K>(*const K);
 
 struct Node<K, V> {
     next: *mut Node<K, V>,
@@ -96,13 +96,13 @@ pub struct LinkedHashMap<K, V, S = hash_map::RandomState> {
 
 impl<K: Hash> Hash for KeyRef<K> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        unsafe { (*self.k).hash(state) }
+        unsafe { (*self.0).hash(state) }
     }
 }
 
 impl<K: PartialEq> PartialEq for KeyRef<K> {
     fn eq(&self, other: &Self) -> bool {
-        unsafe{ (*self.k).eq(&*other.k) }
+        unsafe{ (*self.0).eq(&*other.0) }
     }
 }
 
@@ -120,7 +120,7 @@ impl<Q: ?Sized> Qey<Q> {
 
 impl<K, Q: ?Sized> Borrow<Qey<Q>> for KeyRef<K> where K: Borrow<Q> {
     fn borrow(&self) -> &Qey<Q> {
-        Qey::from_ref(unsafe { (*self.k).borrow() })
+        Qey::from_ref(unsafe { (*self.0).borrow() })
     }
 }
 
@@ -224,6 +224,24 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         Self::with_map(HashMap::with_capacity_and_hasher(capacity, hash_builder))
     }
 
+    #[inline]
+    fn attach_at(&mut self, index: usize, node: *mut Node<K, V>) {
+        if index >= self.map.len() {
+            self.attach(node);
+        } else {
+            unsafe {
+                let mut h = (*self.head).prev;
+                for _ in 0..index {
+                    h = (*h).prev;
+                }
+                (*node).next = (*h).next;
+                (*node).prev = h;
+                (*h).next = node;
+                (*(*node).next).prev = node;
+            }
+        }
+    }
+
     /// Reserves capacity for at least `additional` more elements to be inserted into the map. The
     /// map may reserve more space to avoid frequent allocations.
     ///
@@ -262,7 +280,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
     pub fn entry(&mut self, k: K) -> Entry<K, V, S> {
         let self_ptr: *mut Self = self;
 
-        if let Some(entry) = self.map.get_mut(&KeyRef{k: &k}) {
+        if let Some(entry) = self.map.get_mut(&KeyRef(&k)) {
             return Entry::Occupied(OccupiedEntry {
                 entry: *entry,
                 map: self_ptr,
@@ -330,7 +348,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
     pub fn insert(&mut self, k: K, v: V) -> Option<V> {
         self.ensure_guard_node();
 
-        let (node, old_val) = match self.map.get(&KeyRef{k: &k}) {
+        let (node, old_val) = match self.map.get(&KeyRef(&k)) {
             Some(node) => {
                 let old_val = unsafe { ptr::replace(&mut (**node).value, v) };
                 (*node, Some(old_val))
@@ -358,8 +376,60 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
             }
             None => {
                 let keyref = unsafe { &(*node).key };
-                self.map.insert(KeyRef{k: keyref}, node);
+                self.map.insert(KeyRef(keyref), node);
                 self.attach(node);
+            }
+        }
+        old_val
+    }
+
+    /// Inserts a key-value pair into the map. If the key already existed, the old value is
+    /// returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use linked_hash_map::LinkedHashMap;
+    /// let mut map = LinkedHashMap::new();
+    ///
+    /// map.insert(1, "a");
+    /// map.insert(2, "b");
+    /// assert_eq!(map[&1], "a");
+    /// assert_eq!(map[&2], "b");
+    /// ```
+    pub fn insert_at(&mut self, index: usize, k: K, v: V) -> Option<V> {
+        self.ensure_guard_node();
+
+        let (node, old_val) = match self.map.get(&KeyRef(&k)) {
+            Some(node) => {
+                let old_val = unsafe { ptr::replace(&mut (**node).value, v) };
+                (*node, Some(old_val))
+            }
+            None => {
+                let node = if self.free.is_null() {
+                    Box::into_raw(Box::new(Node::new(k, v)))
+                } else {
+                    // use a recycled box
+                    unsafe {
+                        let free = self.free;
+                        self.free = (*free).next;
+                        ptr::write(free, Node::new(k, v));
+                        free
+                    }
+                };
+                (node, None)
+            }
+        };
+        match old_val {
+            Some(_) => {
+                // Existing node, just update position
+                self.detach(node);
+                self.attach_at(index, node);
+            }
+            None => {
+                let keyref = unsafe { &(*node).key };
+                self.map.insert(KeyRef(keyref), node);
+                self.attach_at(index, node);
             }
         }
         old_val
@@ -477,8 +547,9 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
     ///
     /// ```
     /// use linked_hash_map::LinkedHashMap;
-    /// let mut map: LinkedHashMap<i32, &str> = LinkedHashMap::new();
+    /// let map: LinkedHashMap<i32, &str> = LinkedHashMap::with_capacity(10);
     /// let capacity = map.capacity();
+    /// assert!(capacity >= 10);
     /// ```
     pub fn capacity(&self) -> usize {
         self.map.capacity()
@@ -507,7 +578,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         let lru = unsafe { (*self.head).prev };
         self.detach(lru);
         self.map
-            .remove(&KeyRef{k: unsafe { &(*lru).key }})
+            .remove(&KeyRef(unsafe { &(*lru).key }))
             .map(|e| {
                 let e = *unsafe { Box::from_raw(e) };
                 (e.key, e.value)
@@ -532,7 +603,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         }
         let lru = unsafe { (*self.head).prev };
         self.map
-            .get(&KeyRef{k: unsafe { &(*lru).key }})
+            .get(&KeyRef(unsafe { &(*lru).key }))
             .map(|e| unsafe { (&(**e).key, &(**e).value) })
     }
 
@@ -557,7 +628,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         let mru = unsafe { (*self.head).next };
         self.detach(mru);
         self.map
-            .remove(&KeyRef{k: unsafe { &(*mru).key }})
+            .remove(&KeyRef(unsafe { &(*mru).key }))
             .map(|e| {
                 let e = *unsafe { Box::from_raw(e) };
                 (e.key, e.value)
@@ -582,7 +653,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         }
         let mru = unsafe { (*self.head).next };
         self.map
-            .get(&KeyRef{k: unsafe { &(*mru).key }})
+            .get(&KeyRef(unsafe { &(*mru).key }))
             .map(|e| unsafe { (&(**e).key, &(**e).value) })
     }
 
@@ -655,7 +726,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
     ///
     /// {
     ///     let mut iter = map.iter_mut();
-    ///     let mut entry = iter.next().unwrap();
+    ///     let entry = iter.next().unwrap();
     ///     assert_eq!(&"a", entry.0);
     ///     *entry.1 = 17;
     /// }
@@ -1325,7 +1396,7 @@ impl<'a, K: 'a + Hash + Eq, V: 'a, S: BuildHasher> VacantEntry<'a, K, V, S> {
 
         self.map.attach(node);
 
-        let ret = self.map.map.entry(KeyRef{k: keyref}).or_insert(node);
+        let ret = self.map.map.entry(KeyRef(keyref)).or_insert(node);
         unsafe { &mut (**ret).value }
     }
 }

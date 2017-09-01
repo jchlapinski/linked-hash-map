@@ -18,6 +18,21 @@ fn test_insert_and_get() {
 }
 
 #[test]
+fn test_insert_at() {
+    let mut map = LinkedHashMap::new();
+    map.insert(1, 10);
+    map.insert(2, 20);
+    map.insert(3, 30);
+    map.insert_at(1, 4, 40);
+    let mut iter = map.iter();
+    assert_eq!(map.len(), 4);
+    assert_eq!(iter.next(), Some((&1, &10)));
+    assert_eq!(iter.next(), Some((&4, &40)));
+    assert_eq!(iter.next(), Some((&2, &20)));
+    assert_eq!(iter.next(), Some((&3, &30)));
+}
+
+#[test]
 fn test_index() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
