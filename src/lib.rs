@@ -541,6 +541,27 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         })
     }
 
+    /// Removes and returns the value corresponding to the position in the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use linked_hash_map::LinkedHashMap;
+    /// let mut map = LinkedHashMap::new();
+    ///
+    /// map.insert(2, "a");
+    /// map.insert(10, "b");
+    ///
+    /// assert_eq!(map.contains_key(&2), true);
+    /// assert_eq!(map.remove_at(0), Some("a"));
+    /// assert_eq!(map.contains_key(&2), false);
+    /// assert_eq!(map.len(), 1);
+    /// ```
+    pub fn remove_at(&mut self, index: usize) -> Option<V> {
+        let entry = self.entries().nth(index).expect("index out of bounds");
+        Some(entry.remove())
+    }
+
     /// Returns the maximum number of key-value pairs the map can hold without reallocating.
     ///
     /// # Examples
