@@ -8,7 +8,7 @@ fn assert_opt_eq<V: PartialEq>(opt: Option<&V>, v: V) {
 }
 
 #[test]
-fn test_insert_and_get() {
+fn insert_and_get() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
     map.insert(2, 20);
@@ -18,7 +18,7 @@ fn test_insert_and_get() {
 }
 
 #[test]
-fn test_insert_at() {
+fn insert_at() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
     map.insert(2, 20);
@@ -33,7 +33,7 @@ fn test_insert_at() {
 }
 
 #[test]
-fn test_index() {
+fn index() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
     map.insert(2, 20);
@@ -43,7 +43,7 @@ fn test_index() {
 }
 
 #[test]
-fn test_insert_update() {
+fn insert_update() {
     let mut map = LinkedHashMap::new();
     map.insert("1".to_string(), vec![10, 10]);
     map.insert("1".to_string(), vec![10, 19]);
@@ -52,7 +52,7 @@ fn test_insert_update() {
 }
 
 #[test]
-fn test_entry_insert_vacant() {
+fn entry_insert_vacant() {
     let mut map = LinkedHashMap::new();
     match map.entry("1".to_string()) {
         Entry::Vacant(e) => {
@@ -83,7 +83,7 @@ fn test_entry_insert_vacant() {
 }
 
 #[test]
-fn test_entries_replacing() {
+fn entries_replacing() {
     let mut map = LinkedHashMap::new();
     map.insert("a", 10);
 
@@ -98,7 +98,7 @@ fn test_entries_replacing() {
 }
 
 #[test]
-fn test_entries_remove() {
+fn entries_remove() {
     let mut map = LinkedHashMap::new();
     map.insert("a", 10);
     map.insert("b", 20);
@@ -155,6 +155,7 @@ fn test_entries_remove() {
 
     assert!(map.is_empty());
 }
+
 #[test]
 fn entries_insert() {
     let mut map = LinkedHashMap::new();
@@ -169,7 +170,7 @@ fn entries_insert() {
 }
 
 #[test]
-fn test_debug() {
+fn debug() {
     let mut map = LinkedHashMap::new();
     assert_eq!(format!("{:?}", map), "{}");
     map.insert(1, 10);
@@ -187,7 +188,7 @@ fn test_debug() {
 }
 
 #[test]
-fn test_remove() {
+fn remove() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
     map.insert(2, 20);
@@ -208,7 +209,7 @@ fn test_remove() {
 
 
 #[test]
-fn test_pop() {
+fn pop() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
     map.insert(2, 20);
@@ -234,7 +235,7 @@ fn test_pop() {
 }
 
 #[test]
-fn test_clear() {
+fn clear() {
     let mut map = LinkedHashMap::new();
     map.insert(1, 10);
     map.insert(2, 20);
@@ -245,7 +246,7 @@ fn test_clear() {
 }
 
 #[test]
-fn test_iter() {
+fn iter() {
     let mut map = LinkedHashMap::new();
 
     // empty iter
@@ -281,7 +282,7 @@ fn test_iter() {
 }
 
 #[test]
-fn test_iter_mut() {
+fn iter_mut() {
     let mut map = LinkedHashMap::new();
     map.insert("a", 10);
     map.insert("c", 30);
@@ -310,7 +311,7 @@ fn test_iter_mut() {
 }
 
 #[test]
-fn test_consuming_iter() {
+fn consuming_iter() {
     let map = {
         let mut map = LinkedHashMap::new();
         map.insert("a", 10);
@@ -332,7 +333,7 @@ fn test_consuming_iter() {
 }
 
 #[test]
-fn test_consuming_iter_empty() {
+fn consuming_iter_empty() {
     let map = LinkedHashMap::<&str, i32>::new();
     let mut iter = map.into_iter();
     assert_eq!(None, iter.next());
@@ -341,7 +342,7 @@ fn test_consuming_iter_empty() {
 }
 
 #[test]
-fn test_consuming_iter_with_free_list() {
+fn consuming_iter_with_free_list() {
     let mut map = LinkedHashMap::new();
     map.insert("a", 10);
     map.insert("c", 30);
@@ -355,7 +356,7 @@ fn test_consuming_iter_with_free_list() {
 }
 
 #[test]
-fn test_into_iter_drop() {
+fn into_iter_drop() {
     struct Counter<'a>(&'a mut usize);
 
     impl<'a> Drop for Counter<'a> {
@@ -385,7 +386,7 @@ fn test_into_iter_drop() {
 }
 
 #[test]
-fn test_borrow() {
+fn borrow() {
     #[derive(PartialEq, Eq, Hash)] struct Foo(Bar);
     #[derive(PartialEq, Eq, Hash)] struct Bar(i32);
 
@@ -429,7 +430,7 @@ fn test_borrow() {
 }
 
 #[test]
-fn test_send_sync() {
+fn send_sync() {
     fn is_send_sync<T: Send + Sync>() {}
 
     is_send_sync::<LinkedHashMap<u32, i32>>();

@@ -7,7 +7,7 @@ extern crate serde_test;
 use serde_test::{Token, assert_tokens};
 
 #[test]
-fn test_ser_de_empty() {
+fn ser_de_empty() {
     let map = LinkedHashMap::<char, u32>::new();
 
     assert_tokens(&map, &[
@@ -17,7 +17,7 @@ fn test_ser_de_empty() {
 }
 
 #[test]
-fn test_ser_de() {
+fn ser_de() {
     let mut map = LinkedHashMap::new();
     map.insert('b', 20);
     map.insert('a', 10);
