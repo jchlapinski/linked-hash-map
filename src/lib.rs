@@ -325,7 +325,6 @@ impl<K: Hash + Eq, V, S: BuildHasher> LinkedHashMap<K, V, S> {
         Entries {
             map: self,
             head: head,
-            tail: self.head,
             remaining: self.len(),
             marker: marker::PhantomData,
         }
@@ -962,7 +961,6 @@ pub struct IntoIter<K, V> {
 pub struct Entries<'a, K: 'a, V: 'a, S: 'a = hash_map::RandomState> {
     map: *mut LinkedHashMap<K, V, S>,
     head: *mut Node<K, V>,
-    tail: *mut Node<K, V>,
     remaining: usize,
     marker: marker::PhantomData<(&'a K, &'a mut V, &'a S)>,
 }
@@ -1089,7 +1087,7 @@ impl<'a, K, V, S: BuildHasher> Iterator for Entries<'a, K, V, S> {
     type Item = OccupiedEntry<'a, K, V, S>;
 
     fn next(&mut self) -> Option<OccupiedEntry<'a, K, V, S>> {
-        if self.head == self.tail {
+        if self.remaining == 0 {
             None
         } else {
             self.remaining -= 1;
